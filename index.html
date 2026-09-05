@@ -66,12 +66,11 @@
     cursor: pointer; touch-action: manipulation; position:relative;
   }
   .cal-cell.empty{ background: transparent; border-color: transparent; cursor: default; }
-  .cal-cell.today{ border-color: var(--rust); }
-  .cal-cell.selected{ background: var(--panel-2); border-color: var(--ink); }
-  .cal-daynum{ font-size: 13px; font-weight: 500; }
-  .cal-dot{ width: 6px; height: 6px; border-radius: 50%; margin-top: 3px; }
-  .cal-dot.completed{ background: var(--mat); }
-  .cal-dot.pending{ background: transparent; border: 1px solid var(--dim); }
+  .cal-cell.completed{ background: rgba(138,154,107,0.28); }
+  .cal-cell.pending{ background: rgba(193,68,14,0.18); }
+  .cal-cell.today{ border-color: var(--rust); border-width: 2px; }
+  .cal-cell.selected{ border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+  .cal-daynum{ font-size: 19px; font-weight: 600; }
 
   .day-detail{ background: var(--panel); border: 1px solid var(--border); padding: 16px; margin-top: 14px; }
   .day-detail-head{ display:flex; align-items:baseline; justify-content: space-between; margin-bottom: 12px; }
@@ -115,10 +114,17 @@
     margin: 22px 0 24px; padding: 20px 18px;
     background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--rust);
   }
+  .hero-top-row{ display:flex; justify-content: space-between; align-items:flex-start; gap: 10px; }
   .hero-label{ font-size: 13px; color: var(--dim); margin: 0 0 6px; }
   .hero-value{ font-size: 46px; font-weight: 600; line-height: 1; color: var(--ink); }
   .hero-value small{ font-size: 18px; color: var(--dim); font-weight: 500; margin-left: 6px; }
   .hero-sub{ margin-top: 8px; font-size: 13px; color: var(--dim); }
+  .hero-reset-btn{
+    background: none; border: 1px solid var(--border); color: var(--dim);
+    font-size: 11px; padding: 6px 10px; cursor: pointer; touch-action: manipulation;
+    font-family: 'Inter', sans-serif; flex-shrink: 0; white-space: nowrap;
+  }
+  .hero-reset-btn:active{ border-color: var(--danger); color: var(--danger); }
 
   .toggle-add-btn{
     width: 100%; padding: 14px; background: var(--panel); border: 1px dashed var(--border);
@@ -170,16 +176,29 @@
 
   .exercise-block{ background: var(--panel); border: 1px solid var(--border); margin-bottom: 10px; }
   .exercise-block-head{
-    display:flex; align-items:baseline; justify-content: space-between;
-    padding: 12px 14px; border-bottom: 1px solid var(--border);
+    display:flex; align-items:center; justify-content: space-between;
+    padding: 12px 14px; border-bottom: 1px solid var(--border); gap: 10px;
   }
   .exercise-block-head .name{ font-size: 15px; font-weight: 600; }
+  .exercise-block-head .head-right{ display:flex; align-items:center; gap: 10px; flex-shrink:0; }
   .exercise-block-head .progress{ font-size: 12px; color: var(--mat); }
+
+  .exercise-summary-row{ display:flex; align-items:center; gap: 10px; padding: 12px 14px; }
+  .exercise-summary-row .name{ font-size: 15px; font-weight: 600; flex-shrink: 0; }
+  .exercise-summary-row .summary-detail{ font-size: 12px; color: var(--mat); flex: 1; }
+  .toggle-expand-btn{
+    width: 26px; height: 26px; background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--ink); font-size: 16px; line-height:1; cursor: pointer; touch-action: manipulation;
+    flex-shrink: 0; font-family: 'Oswald', sans-serif;
+  }
+  .toggle-expand-btn:active{ border-color: var(--rust); }
 
   .set-row{ display:flex; align-items:center; gap: 12px; padding: 12px 14px; }
   .set-row + .set-row{ border-top: 1px solid var(--border); }
-  .set-row.completed .set-detail{ color: #6b665c; text-decoration: line-through; }
-  .set-row.completed .set-label{ color: #6b665c; }
+  .set-row.completed{ padding: 6px 14px; gap: 10px; }
+  .set-row.completed .set-line{ color: #7a7468; text-decoration: line-through; font-size: 13px; }
+  .set-row.completed .set-checkbox{ width: 18px; height: 18px; font-size: 11px; }
+  .set-row.completed .del-btn{ width: 20px; height: 20px; font-size: 11px; }
 
   .set-checkbox{
     width: 26px; height: 26px; flex-shrink: 0;
@@ -263,9 +282,15 @@
     </header>
 
     <div class="hero">
-      <p class="hero-label" id="heroLabel">완료 볼륨</p>
-      <div class="hero-value" id="heroVolume">0<small>kg</small></div>
+      <div class="hero-top-row">
+        <div>
+          <p class="hero-label" id="heroLabel">완료 볼륨</p>
+          <div class="hero-value" id="heroVolume">0<small>kg</small></div>
+        </div>
+        <button class="hero-reset-btn" id="resetDayBtn">이 날짜 기록 삭제</button>
+      </div>
       <p class="hero-sub" id="heroSub">아직 완료한 세트가 없어요</p>
+      <p class="hero-sub" id="heroCardio" style="display:none;color:var(--mat);"></p>
     </div>
 
     <section>
@@ -277,28 +302,57 @@
           <button id="customAdd">추가</button>
         </div>
 
-        <div class="stepper-row">
-          <span class="stepper-label">무게(kg)</span>
-          <div class="stepper">
-            <button class="stepbtn" id="weightMinus">−</button>
-            <input id="weightInput" type="number" inputmode="decimal" value="20" step="2.5">
-            <button class="stepbtn" id="weightPlus">+</button>
+        <div id="strengthFields">
+          <div class="stepper-row">
+            <span class="stepper-label">무게(kg)</span>
+            <div class="stepper">
+              <button class="stepbtn" id="weightMinus">−</button>
+              <input id="weightInput" type="number" inputmode="decimal" value="20" step="2.5">
+              <button class="stepbtn" id="weightPlus">+</button>
+            </div>
+          </div>
+          <div class="stepper-row">
+            <span class="stepper-label">횟수</span>
+            <div class="stepper">
+              <button class="stepbtn" id="repsMinus">−</button>
+              <input id="repsInput" type="number" inputmode="numeric" value="8" step="1">
+              <button class="stepbtn" id="repsPlus">+</button>
+            </div>
+          </div>
+          <div class="stepper-row">
+            <span class="stepper-label">세트 수</span>
+            <div class="stepper">
+              <button class="stepbtn" id="setsMinus">−</button>
+              <input id="setsInput" type="number" inputmode="numeric" value="5" step="1">
+              <button class="stepbtn" id="setsPlus">+</button>
+            </div>
           </div>
         </div>
-        <div class="stepper-row">
-          <span class="stepper-label">횟수</span>
-          <div class="stepper">
-            <button class="stepbtn" id="repsMinus">−</button>
-            <input id="repsInput" type="number" inputmode="numeric" value="8" step="1">
-            <button class="stepbtn" id="repsPlus">+</button>
+
+        <div id="cardioFields" style="display:none">
+          <div class="stepper-row">
+            <span class="stepper-label" id="inclineLabel">경사도(%)</span>
+            <div class="stepper">
+              <button class="stepbtn" id="inclineMinus">−</button>
+              <input id="inclineInput" type="number" inputmode="decimal" value="0" step="0.5">
+              <button class="stepbtn" id="inclinePlus">+</button>
+            </div>
           </div>
-        </div>
-        <div class="stepper-row">
-          <span class="stepper-label">세트 수</span>
-          <div class="stepper">
-            <button class="stepbtn" id="setsMinus">−</button>
-            <input id="setsInput" type="number" inputmode="numeric" value="5" step="1">
-            <button class="stepbtn" id="setsPlus">+</button>
+          <div class="stepper-row">
+            <span class="stepper-label">속도(km/h)</span>
+            <div class="stepper">
+              <button class="stepbtn" id="speedMinus">−</button>
+              <input id="speedInput" type="number" inputmode="decimal" value="6" step="0.5">
+              <button class="stepbtn" id="speedPlus">+</button>
+            </div>
+          </div>
+          <div class="stepper-row">
+            <span class="stepper-label">시간(분)</span>
+            <div class="stepper">
+              <button class="stepbtn" id="minutesMinus">−</button>
+              <input id="minutesInput" type="number" inputmode="numeric" value="20" step="1">
+              <button class="stepbtn" id="minutesPlus">+</button>
+            </div>
           </div>
         </div>
 
@@ -307,13 +361,8 @@
     </section>
 
     <section>
-      <p class="section-title" id="workoutListTitle">오늘의 운동</p>
       <div id="todayList"></div>
     </section>
-
-    <footer>
-      <button class="reset-btn" id="resetDayBtn">이 날짜 기록 삭제</button>
-    </footer>
   </div>
 
 </div>
@@ -327,16 +376,17 @@
   let currentWorkoutDate = null;
   let calMonthDate = new Date();
   let selectedDate = null;
+  let expandedExercises = new Set();
 
   const EXERCISE_GROUPS = {
     '가슴': ['벤치프레스','인클라인 벤치프레스','디클라인 벤치프레스','덤벨 벤치프레스','인클라인 덤벨 프레스','덤벨 플라이','케이블 크로스오버','펙덱 플라이','푸시업','딥스','스미스머신 벤치프레스','체스트프레스 머신'],
     '등': ['데드리프트','루마니안 데드리프트','랫풀다운','뉴트럴그립 랫풀다운','바벨로우','덤벨로우','원암 덤벨로우','티바로우','시티드 로우','풀업','친업','백 익스텐션','페이스풀'],
     '어깨': ['오버헤드프레스','밀리터리프레스','덤벨숄더프레스','스미스머신 숄더프레스','사이드 레터럴 레이즈','프론트 레이즈','리어델트 플라이','아놀드프레스','업라이트로우','슈러그'],
-    '하체': ['스쿼트','프론트스쿼트','레그프레스','레그컬','레그익스텐션','런지','불가리안 스플릿 스쿼트','힙쓰러스트','이너타이','아웃타이','스티프레그 데드리프트','카프레이즈','핵스쿼트','스미스머신 스쿼트','굿모닝'],
+    '하체': ['스쿼트','프론트스쿼트','레그프레스','레그컬','레그익스텐션','런지','불가리안 스플릿 스쿼트','힙쓰러스트','스티프레그 데드리프트','카프레이즈','핵스쿼트','스미스머신 스쿼트','굿모닝','이너타이','아웃타이'],
     '팔': ['바벨컬','덤벨컬','해머컬','프리처컬','컨센트레이션컬','케이블컬','트라이셉스 익스텐션','케이블 푸시다운','스컬크러셔','오버헤드 트라이셉스 익스텐션','클로즈그립 벤치프레스'],
     '코어': ['플랭크','사이드 플랭크','크런치','싯업','행잉 레그레이즈','러시안 트위스트','케이블 크런치','마운틴 클라이머','데드버그','브이업'],
     '전완/그립': ['리스트컬','리버스 리스트컬','파머스 캐리'],
-    '유산소': ['러닝','사이클','로잉머신','일립티컬','계단오르기','줄넘기','버피']
+    '유산소': ['러닝머신','사이클','로잉머신','계단오르기','줄넘기']
   };
 
   const $ = (id) => document.getElementById(id);
@@ -401,9 +451,10 @@
     const byEx = {};
     const order = [];
     completed.forEach(e => {
-      if(!byEx[e.exercise]){ byEx[e.exercise] = { sets:0, volume:0 }; order.push(e.exercise); }
+      if(!byEx[e.exercise]){ byEx[e.exercise] = { sets:0, volume:0, minutes:0 }; order.push(e.exercise); }
       byEx[e.exercise].sets += 1;
       byEx[e.exercise].volume += e.weight * e.reps;
+      byEx[e.exercise].minutes += e.type === 'cardio' ? (e.minutes || 0) : 0;
     });
     let durationMin = null;
     if(completed.length >= 2){
@@ -438,12 +489,11 @@
       const ds = dateKey(y,m,d);
       const sum = daySummary(ds);
       let cls = 'cal-cell';
+      if(sum.hasCompleted) cls += ' completed';
+      else if(sum.hasPendingOnly) cls += ' pending';
       if(ds === today) cls += ' today';
       if(ds === selectedDate) cls += ' selected';
-      let dot = '';
-      if(sum.hasCompleted) dot = '<div class="cal-dot completed"></div>';
-      else if(sum.hasPendingOnly) dot = '<div class="cal-dot pending"></div>';
-      html += `<div class="${cls}" data-date="${ds}"><span class="cal-daynum">${d}</span>${dot}</div>`;
+      html += `<div class="${cls}" data-date="${ds}"><span class="cal-daynum">${d}</span></div>`;
     }
     $('calGrid').innerHTML = html;
     $('calGrid').querySelectorAll('.cal-cell:not(.empty)').forEach(cell => {
@@ -470,7 +520,7 @@
     let exHtml = sum.exercises.map(ex => `
       <div class="day-ex-row">
         <span class="n">${escapeHtml(ex.name)}</span>
-        <span class="v">${ex.sets}세트 · ${fmtNum(ex.volume)}kg</span>
+        <span class="v">${ex.volume > 0 ? ex.sets + '세트 · ' + fmtNum(ex.volume) + 'kg' : (ex.minutes > 0 ? ex.minutes + '분' : ex.sets + '세트')}</span>
       </div>
     `).join('');
 
@@ -538,7 +588,9 @@
     source.forEach((e,i) => {
       entries.push({
         id: baseTs + '-' + i + '-' + Math.random().toString(36).slice(2,6),
-        date: targetDate, exercise: e.exercise, weight: e.weight, reps: e.reps,
+        date: targetDate, exercise: e.exercise, type: e.type || 'strength',
+        weight: e.weight, reps: e.reps,
+        incline: e.incline, speed: e.speed, minutes: e.minutes,
         ts: baseTs + i, completed: false, completedTs: null
       });
     });
@@ -558,13 +610,13 @@
   // ================= WORKOUT VIEW =================
   function openWorkout(dateStr){
     currentWorkoutDate = dateStr;
+    expandedExercises = new Set();
     dismissTimer();
     $('calendarView').style.display = 'none';
     $('workoutView').style.display = 'block';
     const isToday = dateStr === todayStr();
     $('workoutDateLabel').textContent = fmtDateLabel(dateStr);
     $('heroLabel').textContent = (isToday ? '오늘' : fmtDateLabel(dateStr)) + ' 완료 볼륨';
-    $('workoutListTitle').textContent = isToday ? '오늘의 운동' : fmtDateLabel(dateStr) + ' 운동';
     renderWorkout();
   }
   $('backBtn').addEventListener('click', () => { dismissTimer(); renderCalendar(); });
@@ -596,10 +648,21 @@
     html += `<option value="__custom__">+ 새 운동 이름 추가</option>`;
     sel.innerHTML = html;
   }
+  function isCardioExercise(name){
+    return EXERCISE_GROUPS['유산소'].includes(name);
+  }
+  function isResistanceType(name){
+    return name === '사이클' || name === '로잉머신';
+  }
   $('exerciseSelect').addEventListener('change', () => {
-    const isCustom = $('exerciseSelect').value === '__custom__';
+    const val = $('exerciseSelect').value;
+    const isCustom = val === '__custom__';
     $('customRow').classList.toggle('show', isCustom);
     if(isCustom) $('customInput').focus();
+    const cardio = isCardioExercise(val);
+    $('strengthFields').style.display = cardio ? 'none' : 'block';
+    $('cardioFields').style.display = cardio ? 'block' : 'none';
+    $('inclineLabel').textContent = isResistanceType(val) ? '저항' : '경사도(%)';
   });
   $('customAdd').addEventListener('click', async () => {
     const name = $('customInput').value.trim();
@@ -627,6 +690,9 @@
   bindStepper('weightMinus','weightPlus','weightInput', 2.5, 0);
   bindStepper('repsMinus','repsPlus','repsInput', 1, 1);
   bindStepper('setsMinus','setsPlus','setsInput', 1, 1);
+  bindStepper('inclineMinus','inclinePlus','inclineInput', 0.5, 0);
+  bindStepper('speedMinus','speedPlus','speedInput', 0.5, 0);
+  bindStepper('minutesMinus','minutesPlus','minutesInput', 1, 1);
 
   // ---------- Add exercise ----------
   $('addBtn').addEventListener('click', async () => {
@@ -637,18 +703,31 @@
       return;
     }
     const exercise = sel.value;
-    const weight = parseFloat($('weightInput').value) || 0;
-    const reps = parseInt($('repsInput').value) || 0;
-    const setsCount = Math.max(1, parseInt($('setsInput').value) || 5);
-    if(reps <= 0){ $('repsInput').focus(); return; }
-
     const baseTs = Date.now();
-    for(let i = 0; i < setsCount; i++){
+
+    if(isCardioExercise(exercise)){
+      const incline = parseFloat($('inclineInput').value) || 0;
+      const speed = parseFloat($('speedInput').value) || 0;
+      const minutes = parseInt($('minutesInput').value) || 0;
+      if(minutes <= 0){ $('minutesInput').focus(); return; }
       entries.push({
-        id: baseTs + '-' + i + '-' + Math.random().toString(36).slice(2,6),
-        date: currentWorkoutDate, exercise, weight, reps,
-        ts: baseTs + i, completed: false, completedTs: null
+        id: baseTs + '-0-' + Math.random().toString(36).slice(2,6),
+        date: currentWorkoutDate, exercise, type: 'cardio',
+        weight: 0, reps: 0, incline, speed, minutes,
+        ts: baseTs, completed: false, completedTs: null
       });
+    } else {
+      const weight = parseFloat($('weightInput').value) || 0;
+      const reps = parseInt($('repsInput').value) || 0;
+      const setsCount = Math.max(1, parseInt($('setsInput').value) || 5);
+      if(reps <= 0){ $('repsInput').focus(); return; }
+      for(let i = 0; i < setsCount; i++){
+        entries.push({
+          id: baseTs + '-' + i + '-' + Math.random().toString(36).slice(2,6),
+          date: currentWorkoutDate, exercise, type: 'strength', weight, reps,
+          ts: baseTs + i, completed: false, completedTs: null
+        });
+      }
     }
     closeAddPanel();
     renderWorkout();
@@ -656,8 +735,8 @@
   });
 
   // ---------- Rest timer (inline bar between sets) ----------
-  let timerDuration = 90;
-  let timerRemaining = 90;
+  let timerDuration = 180;
+  let timerRemaining = 180;
   let timerInterval = null;
   let timerActiveAfterId = null;
   let timerFinished = false;
@@ -729,7 +808,7 @@
     });
   }
   function restBarHtml(){
-    const durations = [60,90,120,180];
+    const durations = [120,180,240];
     const chips = durations.map(sec => `<div class="rest-chip ${sec===timerDuration?'active':''}" data-sec="${sec}">${sec}초</div>`).join('');
     return `
       <div class="rest-bar ${timerFinished ? 'done' : ''}" id="restBar">
@@ -751,7 +830,7 @@
     e.completed = !e.completed;
     e.completedTs = e.completed ? Date.now() : null;
 
-    if(e.completed){
+    if(e.completed && e.exercise !== '러닝머신'){
       timerActiveAfterId = id; timerRemaining = timerDuration; timerFinished = false;
     } else if(timerActiveAfterId === id){
       dismissTimer();
@@ -765,6 +844,14 @@
   async function deleteEntry(id){
     if(timerActiveAfterId === id) dismissTimer();
     entries = entries.filter(e => e.id !== id);
+    renderWorkout();
+    await saveEntries();
+  }
+
+  async function deleteExerciseGroup(exName){
+    const willRemove = entries.filter(e => e.date === currentWorkoutDate && e.exercise === exName);
+    if(willRemove.some(e => e.id === timerActiveAfterId)) dismissTimer();
+    entries = entries.filter(e => !(e.date === currentWorkoutDate && e.exercise === exName));
     renderWorkout();
     await saveEntries();
   }
@@ -783,10 +870,18 @@
     const completedToday = dayEntries.filter(e => e.completed);
 
     const totalVolume = completedToday.reduce((s,e) => s + e.weight * e.reps, 0);
+    const totalCardioMinutes = completedToday.reduce((s,e) => s + (e.type === 'cardio' ? (e.minutes || 0) : 0), 0);
     $('heroVolume').innerHTML = fmtNum(totalVolume) + '<small>kg</small>';
     $('heroSub').textContent = dayEntries.length
       ? completedToday.length + ' / ' + dayEntries.length + ' 세트 완료'
       : '아직 완료한 세트가 없어요';
+    const heroCardio = $('heroCardio');
+    if(totalCardioMinutes > 0){
+      heroCardio.textContent = '유산소 ' + totalCardioMinutes + '분 완료';
+      heroCardio.style.display = 'block';
+    } else {
+      heroCardio.style.display = 'none';
+    }
 
     const todayList = $('todayList');
     if(dayEntries.length === 0){
@@ -801,22 +896,75 @@
       todayList.innerHTML = order.map(ex => {
         const sets = groups[ex];
         const done = sets.filter(s => s.completed).length;
-        const rows = sets.map(s => `
-          <div class="set-row ${s.completed ? 'completed' : ''}">
-            <div class="set-checkbox ${s.completed ? 'checked' : ''}" data-id="${s.id}">${s.completed ? '✓' : ''}</div>
-            <div class="set-main">
-              <span class="set-label">${s.setNumber}세트</span>
-              <span class="set-detail"><span class="num">${fmtNum(s.weight)}</span>kg × <span class="num">${s.reps}</span>회</span>
+        const allDone = sets.length > 0 && done === sets.length;
+        const timerInThisGroup = sets.some(s => s.id === timerActiveAfterId);
+        const isExpanded = expandedExercises.has(ex) || timerInThisGroup;
+
+        if(allDone && !isExpanded){
+          const totalVolume = sets.reduce((s,x) => s + x.weight * x.reps, 0);
+          const totalMinutes = sets.reduce((s,x) => s + (x.type === 'cardio' ? (x.minutes || 0) : 0), 0);
+          const detailText = totalVolume > 0
+            ? `${sets.length}세트 완료 · ${fmtNum(totalVolume)}kg`
+            : (totalMinutes > 0 ? `${sets.length}회 · ${totalMinutes}분` : `${sets.length}세트 완료`);
+          return `
+            <div class="exercise-block">
+              <div class="exercise-summary-row">
+                <span class="name">${escapeHtml(ex)}</span>
+                <span class="summary-detail">${detailText}</span>
+                <button class="toggle-expand-btn" data-expand="${escapeHtml(ex)}">+</button>
+                <button class="del-btn" data-delex="${escapeHtml(ex)}" aria-label="운동 삭제">✕</button>
+              </div>
             </div>
-            <button class="del-btn" data-del="${s.id}" aria-label="삭제">✕</button>
-          </div>
-          ${timerActiveAfterId === s.id ? restBarHtml() : ''}
-        `).join('');
+          `;
+        }
+
+        const rows = sets.map(s => {
+          const isCardio = s.type === 'cardio';
+          const resistance = isCardio && isResistanceType(ex);
+          const inclineText = s.incline
+            ? (resistance ? ` × 저항${fmtNum(s.incline)}` : ` × 경사도${fmtNum(s.incline)}%`)
+            : '';
+          const inclineTextMid = s.incline
+            ? (resistance ? ` · 저항${fmtNum(s.incline)}` : ` · 경사도${fmtNum(s.incline)}%`)
+            : '';
+          let lineHtml;
+          if(s.completed){
+            lineHtml = isCardio
+              ? `${escapeHtml(ex)} ${fmtNum(s.speed)}km/h × ${s.minutes}분${inclineText}`
+              : `${escapeHtml(ex)} ${fmtNum(s.weight)}kg × ${s.reps}회 × ${s.setNumber}세트`;
+            return `
+              <div class="set-row completed">
+                <div class="set-checkbox checked" data-id="${s.id}">✓</div>
+                <div class="set-main" style="flex-direction:row;"><span class="set-line">${lineHtml}</span></div>
+                <button class="del-btn" data-del="${s.id}" aria-label="삭제">✕</button>
+              </div>
+              ${timerActiveAfterId === s.id ? restBarHtml() : ''}
+            `;
+          }
+          const detailHtml = isCardio
+            ? `<span class="num">${fmtNum(s.speed)}</span>km/h · <span class="num">${s.minutes}</span>분${inclineTextMid}`
+            : `<span class="num">${fmtNum(s.weight)}</span>kg × <span class="num">${s.reps}</span>회`;
+          return `
+            <div class="set-row">
+              <div class="set-checkbox" data-id="${s.id}"></div>
+              <div class="set-main">
+                <span class="set-label">${s.setNumber}세트</span>
+                <span class="set-detail">${detailHtml}</span>
+              </div>
+              <button class="del-btn" data-del="${s.id}" aria-label="삭제">✕</button>
+            </div>
+            ${timerActiveAfterId === s.id ? restBarHtml() : ''}
+          `;
+        }).join('');
         return `
           <div class="exercise-block">
             <div class="exercise-block-head">
               <span class="name">${escapeHtml(ex)}</span>
-              <span class="progress">${done} / ${sets.length}</span>
+              <div class="head-right">
+                <span class="progress">${done} / ${sets.length}</span>
+                ${allDone ? `<button class="toggle-expand-btn" data-expand="${escapeHtml(ex)}">−</button>` : ''}
+                <button class="del-btn" data-delex="${escapeHtml(ex)}" aria-label="운동 삭제">✕</button>
+              </div>
             </div>
             ${rows}
           </div>
@@ -824,7 +972,13 @@
       }).join('');
 
       todayList.querySelectorAll('.set-checkbox').forEach(box => box.addEventListener('click', () => toggleComplete(box.dataset.id)));
-      todayList.querySelectorAll('.del-btn').forEach(btn => btn.addEventListener('click', () => deleteEntry(btn.dataset.del)));
+      todayList.querySelectorAll('.del-btn[data-del]').forEach(btn => btn.addEventListener('click', () => deleteEntry(btn.dataset.del)));
+      todayList.querySelectorAll('.del-btn[data-delex]').forEach(btn => btn.addEventListener('click', () => deleteExerciseGroup(btn.dataset.delex)));
+      todayList.querySelectorAll('.toggle-expand-btn').forEach(btn => btn.addEventListener('click', () => {
+        const ex = btn.dataset.expand;
+        if(expandedExercises.has(ex)) expandedExercises.delete(ex); else expandedExercises.add(ex);
+        renderWorkout();
+      }));
       bindRestBarEvents();
     }
   }
