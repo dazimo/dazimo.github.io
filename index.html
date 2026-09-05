@@ -329,13 +329,14 @@
   let selectedDate = null;
 
   const EXERCISE_GROUPS = {
-    '가슴': ['벤치프레스','인클라인 벤치프레스','덤벨 플라이','푸시업','딥스'],
-    '등': ['데드리프트','랫풀다운','바벨로우','풀업','시티드 로우'],
-    '어깨': ['오버헤드프레스','사이드 레터럴 레이즈','페이스풀','아놀드프레스'],
-    '하체': ['스쿼트','레그프레스','레그컬','레그익스텐션','런지','힙쓰러스트'],
-    '팔': ['바벨컬','덤벨컬','트라이셉스 익스텐션','케이블 푸시다운'],
-    '코어': ['플랭크','크런치','행잉 레그레이즈','러시안 트위스트'],
-    '유산소': ['러닝','사이클','로잉머신']
+    '가슴': ['벤치프레스','인클라인 벤치프레스','디클라인 벤치프레스','덤벨 벤치프레스','인클라인 덤벨 프레스','덤벨 플라이','케이블 크로스오버','펙덱 플라이','푸시업','딥스','스미스머신 벤치프레스','체스트프레스 머신'],
+    '등': ['데드리프트','루마니안 데드리프트','랫풀다운','뉴트럴그립 랫풀다운','바벨로우','덤벨로우','원암 덤벨로우','티바로우','시티드 로우','풀업','친업','백 익스텐션','페이스풀'],
+    '어깨': ['오버헤드프레스','밀리터리프레스','덤벨숄더프레스','스미스머신 숄더프레스','사이드 레터럴 레이즈','프론트 레이즈','리어델트 플라이','아놀드프레스','업라이트로우','슈러그'],
+    '하체': ['스쿼트','프론트스쿼트','레그프레스','레그컬','레그익스텐션','런지','불가리안 스플릿 스쿼트','힙쓰러스트','이너타이','아웃타이','스티프레그 데드리프트','카프레이즈','핵스쿼트','스미스머신 스쿼트','굿모닝'],
+    '팔': ['바벨컬','덤벨컬','해머컬','프리처컬','컨센트레이션컬','케이블컬','트라이셉스 익스텐션','케이블 푸시다운','스컬크러셔','오버헤드 트라이셉스 익스텐션','클로즈그립 벤치프레스'],
+    '코어': ['플랭크','사이드 플랭크','크런치','싯업','행잉 레그레이즈','러시안 트위스트','케이블 크런치','마운틴 클라이머','데드버그','브이업'],
+    '전완/그립': ['리스트컬','리버스 리스트컬','파머스 캐리'],
+    '유산소': ['러닝','사이클','로잉머신','일립티컬','계단오르기','줄넘기','버피']
   };
 
   const $ = (id) => document.getElementById(id);
@@ -354,19 +355,14 @@
   function fmtNum(n){ return Number(n).toLocaleString('ko-KR', { maximumFractionDigits: 1 }); }
   function escapeHtml(str){ const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
 
-  // ---------- Storage ----------
+  // ---------- Storage (localStorage: works on GitHub Pages / standalone hosting) ----------
   async function loadAll(){
-    wrap.insertAdjacentHTML('afterbegin', '<div class="status-msg" id="loadingMsg">불러오는 중…</div>');
     try{
-      const [entriesRes, customRes] = await Promise.all([
-        window.storage.get(ENTRIES_KEY, false).catch(() => null),
-        window.storage.get(CUSTOM_KEY, false).catch(() => null)
-      ]);
-      entries = entriesRes && entriesRes.value ? JSON.parse(entriesRes.value) : [];
-      customExercises = customRes && customRes.value ? JSON.parse(customRes.value) : [];
+      const rawEntries = localStorage.getItem(ENTRIES_KEY);
+      const rawCustom = localStorage.getItem(CUSTOM_KEY);
+      entries = rawEntries ? JSON.parse(rawEntries) : [];
+      customExercises = rawCustom ? JSON.parse(rawCustom) : [];
     }catch(err){ entries = []; customExercises = []; }
-    const loadingMsg = $('loadingMsg');
-    if(loadingMsg) loadingMsg.remove();
     buildExerciseOptions();
     selectedDate = todayStr();
     renderCalendar();
@@ -374,12 +370,11 @@
 
   async function saveEntries(){
     try{
-      const result = await window.storage.set(ENTRIES_KEY, JSON.stringify(entries), false);
-      if(!result) showTransientMsg('저장에 실패했어요. 네트워크를 확인해 주세요.', true);
-    }catch(err){ showTransientMsg('저장에 실패했어요. 네트워크를 확인해 주세요.', true); }
+      localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries));
+    }catch(err){ showTransientMsg('저장에 실패했어요. 브라우저 저장 공간을 확인해 주세요.', true); }
   }
   async function saveCustom(){
-    try{ await window.storage.set(CUSTOM_KEY, JSON.stringify(customExercises), false); }
+    try{ localStorage.setItem(CUSTOM_KEY, JSON.stringify(customExercises)); }
     catch(err){ /* non-critical */ }
   }
   function showTransientMsg(text, isErr){
@@ -839,4 +834,3 @@
 </script>
 </body>
 </html>
-
