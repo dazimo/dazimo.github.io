@@ -125,6 +125,7 @@
     font-family: 'Inter', sans-serif; flex-shrink: 0; white-space: nowrap;
   }
   .hero-reset-btn:active{ border-color: var(--danger); color: var(--danger); }
+  .hero-reset-btn.confirming{ background: var(--danger); border-color: var(--danger); color: #fff; }
 
   .toggle-add-btn{
     width: 100%; padding: 14px; background: var(--panel); border: 1px dashed var(--border);
@@ -173,6 +174,13 @@
     font-family: 'Oswald', sans-serif;
   }
   .add-btn:active{ background: var(--rust-dim); }
+
+  .end-workout-btn{
+    width: 100%; padding: 15px; background: var(--mat); border: none;
+    color: #1C1B1A; font-size: 16px; font-weight: 700; letter-spacing: 0.3px;
+    cursor: pointer; touch-action: manipulation; font-family: 'Oswald', sans-serif;
+  }
+  .end-workout-btn:active{ background: #6f8156; }
 
   .exercise-block{ background: var(--panel); border: 1px solid var(--border); margin-bottom: 10px; }
   .exercise-block-head{
@@ -267,10 +275,6 @@
     <div class="cal-grid" id="calGrid"></div>
 
     <div id="dayDetail"></div>
-
-    <footer>
-      <button class="reset-btn" id="resetAllBtn">전체 기록 삭제</button>
-    </footer>
   </div>
 
   <!-- ===================== WORKOUT VIEW ===================== -->
@@ -307,7 +311,7 @@
             <span class="stepper-label">무게(kg)</span>
             <div class="stepper">
               <button class="stepbtn" id="weightMinus">−</button>
-              <input id="weightInput" type="number" inputmode="decimal" value="20" step="2.5">
+              <input id="weightInput" type="number" inputmode="decimal" value="20" step="0.25">
               <button class="stepbtn" id="weightPlus">+</button>
             </div>
           </div>
@@ -363,6 +367,10 @@
     <section>
       <div id="todayList"></div>
     </section>
+
+    <section>
+      <button class="end-workout-btn" id="endWorkoutBtn">운동 종료</button>
+    </section>
   </div>
 
 </div>
@@ -371,8 +379,10 @@
 (function(){
   const ENTRIES_KEY = 'entries';
   const CUSTOM_KEY = 'customExercises';
+  const SESSIONS_KEY = 'sessions';
   let entries = [];
   let customExercises = [];
+  let sessions = {};
   let currentWorkoutDate = null;
   let calMonthDate = new Date();
   let selectedDate = null;
@@ -402,7 +412,7 @@
     const days = ['일','월','화','수','목','금','토'];
     return (d.getMonth()+1) + '월 ' + d.getDate() + '일 (' + days[d.getDay()] + ')';
   }
-  function fmtNum(n){ return Number(n).toLocaleString('ko-KR', { maximumFractionDigits: 1 }); }
+  function fmtNum(n){ return Number(n).toLocaleString('ko-KR', { maximumFractionDigits: 2 }); }
   function escapeHtml(str){ const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
 
   // ---------- Storage (localStorage: works on GitHub Pages / standalone hosting) ----------
@@ -410,9 +420,11 @@
     try{
       const rawEntries = localStorage.getItem(ENTRIES_KEY);
       const rawCustom = localStorage.getItem(CUSTOM_KEY);
+      const rawSessions = localStorage.getItem(SESSIONS_KEY);
       entries = rawEntries ? JSON.parse(rawEntries) : [];
       customExercises = rawCustom ? JSON.parse(rawCustom) : [];
-    }catch(err){ entries = []; customExercises = []; }
+      sessions = rawSessions ? JSON.parse(rawSessions) : {};
+    }catch(err){ entries = []; customExercises = []; sessions = {}; }
     buildExerciseOptions();
     selectedDate = todayStr();
     renderCalendar();
@@ -425,6 +437,10 @@
   }
   async function saveCustom(){
     try{ localStorage.setItem(CUSTOM_KEY, JSON.stringify(customExercises)); }
+    catch(err){ /* non-critical */ }
+  }
+  async function saveSessions(){
+    try{ localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions)); }
     catch(err){ /* non-critical */ }
   }
   function showTransientMsg(text, isErr){
@@ -457,7 +473,10 @@
       byEx[e.exercise].minutes += e.type === 'cardio' ? (e.minutes || 0) : 0;
     });
     let durationMin = null;
-    if(completed.length >= 2){
+    const sess = sessions[dateStr];
+    if(sess && sess.startTs && sess.endTs){
+      durationMin = Math.max(1, Math.round((sess.endTs - sess.startTs) / 60000));
+    } else if(completed.length >= 2){
       const ts = completed.map(e => e.completedTs).filter(Boolean);
       if(ts.length >= 2) durationMin = Math.max(1, Math.round((Math.max(...ts) - Math.min(...ts)) / 60000));
     }
@@ -600,13 +619,6 @@
   $('calPrev').addEventListener('click', () => { calMonthDate.setMonth(calMonthDate.getMonth()-1); renderCalendar(); });
   $('calNext').addEventListener('click', () => { calMonthDate.setMonth(calMonthDate.getMonth()+1); renderCalendar(); });
 
-  $('resetAllBtn').addEventListener('click', async () => {
-    if(!confirm('모든 운동 기록을 삭제할까요? 되돌릴 수 없어요.')) return;
-    entries = [];
-    await saveEntries();
-    renderCalendar();
-  });
-
   // ================= WORKOUT VIEW =================
   function openWorkout(dateStr){
     currentWorkoutDate = dateStr;
@@ -678,16 +690,17 @@
   // ---------- Steppers ----------
   function bindStepper(minusId, plusId, inputId, step, min){
     const input = $(inputId);
+    const decimals = step.toString().includes('.') ? step.toString().split('.')[1].length : 0;
     $(minusId).addEventListener('click', () => {
       const v = Math.max(min, (parseFloat(input.value) || 0) - step);
-      input.value = (step % 1 !== 0) ? v.toFixed(1).replace(/\.0$/,'') : v;
+      input.value = decimals ? parseFloat(v.toFixed(decimals)) : v;
     });
     $(plusId).addEventListener('click', () => {
       const v = (parseFloat(input.value) || 0) + step;
-      input.value = (step % 1 !== 0) ? v.toFixed(1).replace(/\.0$/,'') : v;
+      input.value = decimals ? parseFloat(v.toFixed(decimals)) : v;
     });
   }
-  bindStepper('weightMinus','weightPlus','weightInput', 2.5, 0);
+  bindStepper('weightMinus','weightPlus','weightInput', 0.25, 0);
   bindStepper('repsMinus','repsPlus','repsInput', 1, 1);
   bindStepper('setsMinus','setsPlus','setsInput', 1, 1);
   bindStepper('inclineMinus','inclinePlus','inclineInput', 0.5, 0);
@@ -704,6 +717,13 @@
     }
     const exercise = sel.value;
     const baseTs = Date.now();
+
+    if(!sessions[currentWorkoutDate]){
+      sessions[currentWorkoutDate] = { startTs: baseTs, endTs: null };
+    } else if(sessions[currentWorkoutDate].endTs){
+      sessions[currentWorkoutDate].endTs = null;
+    }
+    await saveSessions();
 
     if(isCardioExercise(exercise)){
       const incline = parseFloat($('inclineInput').value) || 0;
@@ -856,12 +876,46 @@
     await saveEntries();
   }
 
+  let resetDayConfirmTimeout = null;
   $('resetDayBtn').addEventListener('click', async () => {
-    if(!confirm('이 날짜의 기록을 삭제할까요? 되돌릴 수 없어요.')) return;
+    const btn = $('resetDayBtn');
+    if(!btn.classList.contains('confirming')){
+      btn.classList.add('confirming');
+      btn.textContent = '한 번 더 누르면 삭제돼요';
+      clearTimeout(resetDayConfirmTimeout);
+      resetDayConfirmTimeout = setTimeout(() => {
+        btn.classList.remove('confirming');
+        btn.textContent = '이 날짜 기록 삭제';
+      }, 3000);
+      return;
+    }
+    clearTimeout(resetDayConfirmTimeout);
+    btn.classList.remove('confirming');
+    btn.textContent = '이 날짜 기록 삭제';
     dismissTimer();
     entries = entries.filter(e => e.date !== currentWorkoutDate);
+    delete sessions[currentWorkoutDate];
     renderWorkout();
     await saveEntries();
+    await saveSessions();
+  });
+
+  $('endWorkoutBtn').addEventListener('click', async () => {
+    const dayEntries = entries.filter(e => e.date === currentWorkoutDate);
+    if(dayEntries.length === 0){
+      showTransientMsg('먼저 운동을 추가해 주세요.');
+      return;
+    }
+    const now = Date.now();
+    if(!sessions[currentWorkoutDate]){
+      sessions[currentWorkoutDate] = { startTs: Math.min(...dayEntries.map(e => e.ts)), endTs: null };
+    }
+    sessions[currentWorkoutDate].endTs = now;
+    await saveSessions();
+    const mins = Math.max(1, Math.round((sessions[currentWorkoutDate].endTs - sessions[currentWorkoutDate].startTs) / 60000));
+    dismissTimer();
+    renderCalendar();
+    showTransientMsg('운동 종료! 총 ' + mins + '분');
   });
 
   // ---------- Render workout view ----------
